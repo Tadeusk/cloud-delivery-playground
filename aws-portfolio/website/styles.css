@@ -1,0 +1,95 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 0;
+    color: #222;
+}
+
+.container {
+    max-width: 900px;
+    margin: 40px auto;
+    background: white;
+    padding: 40px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+h1 {
+    margin-bottom: 5px;
+    font-size: 32px;
+}
+
+.title {
+    color: #555;
+    margin-bottom: 10px;
+}
+
+.contact a {
+    text-decoration: none;
+    color: #0073e6;
+}
+
+.contact span {
+    margin: 0 8px;
+    color: #aaa;
+}
+
+section {
+    margin-bottom: 25px;
+}
+
+h2 {
+    font-size: 18px;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.skills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    list-style: none;
+    padding: 0;
+}
+
+.skills li {
+    background: #eef2f7;
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.job h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.company {
+    font-size: 14px;
+    color: #777;
+    margin-bottom: 8px;
+}
+
+ul {
+    padding-left: 18px;
+}
+
+@media print {
+    body {
+        background: white;
+    }
+
+    .container {
+        box-shadow: none;
+        margin: 0;
+        padding: 0;
+    }
+}
