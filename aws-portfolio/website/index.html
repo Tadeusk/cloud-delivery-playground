@@ -22,7 +22,7 @@
     <nav class="sticky top-0 z-50 p-6 glass border-x-0 border-t-0">
         <div class="max-w-6xl mx-auto flex justify-between items-center">
             <span class="text-xl font-extrabold tracking-tighter text-white">KTad<span class="text-blue-500">.</span>CLOUD</span>
-            <div id="visitor-counter" class="text-xs font-mono bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20 text-blue-400">
+            <div id="counter" class="text-xs font-mono bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20 text-blue-400">
                 Ładowanie statystyk...
             </div>
         </div>
@@ -82,12 +82,34 @@
     <footer class="py-20 text-center text-slate-500 text-sm">
         &copy; 2026 KTad.Cloud - Built with AWS & Automation
     </footer>
+<script>
+    async function updateCounter() {
+        const API_URL = "https://9ij830e26d.execute-api.eu-west-1.amazonaws.com/prod";
+        const counterElement = document.getElementById('counter');
 
-    <script>
-        // Placeholder dla licznika odwiedzin
-        setTimeout(() => {
-            document.getElementById('visitor-counter').innerText = 'Wizyt: 1,337';
-        }, 1500);
-    </script>
+        // Sprawdzamy, czy użytkownik już tu był w tej przeglądarce
+        const hasVisited = localStorage.getItem('portfolio_visited');
+
+        try {
+            // Jeśli był, wysyłamy zapytanie, ale Twoja Lambda i tak inkrementuje przy każdym GET.
+            // Żeby to było idealne, musiałbyś mieć dwa osobne endpointy (jeden do pobierania, drugi do nabijania).
+            // Na ten moment zróbmy tak:
+        
+            const response = await fetch(API_URL);
+            const data = await response.json();
+
+            if (counterElement) {
+                counterElement.innerText = data.count;
+                // Oznaczamy użytkownika jako "zaliczonego"
+                localStorage.setItem('portfolio_visited', 'true');
+            }
+        } catch (error) {
+            console.error("Błąd:", error);
+            if (counterElement) counterElement.innerText = "Error";
+        }
+    }
+
+    window.onload = updateCounter;
+</script>
 </body>
 </html>

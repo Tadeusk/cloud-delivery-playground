@@ -11,3 +11,4 @@ crash.log
 backups/
 backup.sh
 *tfstate.lock.info
+aws-cli.md
