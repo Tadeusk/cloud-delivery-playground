@@ -10,3 +10,4 @@ crash.log
 *.lock.hcl
 backups/
 backup.sh
+*tfstate.lock.info
