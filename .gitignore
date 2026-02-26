@@ -12,3 +12,4 @@ backups/
 backup.sh
 *tfstate.lock.info
 aws-cli.md
+cloud-delivery-playground.code-workspace

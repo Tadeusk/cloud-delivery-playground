@@ -168,3 +168,175 @@ resource "null_resource" "invalidate_cache" {
     aws_cloudfront_distribution.s3_distribution
   ]
 }
+
+resource "aws_dynamodb_table" "portfolio_table" {
+  name           = "ktad-portfolio-table"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "PK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+}
+
+resource "aws_iam_role" "lambda_role" {
+  name = "PortfolioLambdaRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_dynamo" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_logs" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# --- LAMBDA FUNCTION ---
+resource "aws_lambda_function" "portfolio_counter" {
+  filename      = "lambda-functions/function.zip"
+  function_name = "portfolio-counter"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.11" 
+
+  source_code_hash = filebase64sha256("lambda-functions/function.zip")
+}
+
+resource "aws_lambda_permission" "apigw" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.portfolio_counter.function_name
+  principal     = "apigateway.amazonaws.com"
+  
+  # Opcjonalnie do konkretnego API:
+  # source_arn = "${aws_api_gateway_rest_api.portfolio_api.execution_arn}/*/*"
+}
+
+resource "aws_api_gateway_resource" "root" {
+  rest_api_id = aws_api_gateway_rest_api.portfolio_api.id
+  parent_id   = aws_api_gateway_rest_api.portfolio_api.root_resource_id
+  path_part   = "prod" 
+}
+
+resource "aws_api_gateway_rest_api" "portfolio_api" {
+  name        = "PortfolioAPI"
+  description = "API for Portfolio Counter"
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+}
+
+resource "aws_api_gateway_method" "get" {
+  rest_api_id   = aws_api_gateway_rest_api.portfolio_api.id
+  resource_id   = aws_api_gateway_rest_api.portfolio_api.root_resource_id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.portfolio_api.id
+  resource_id             = aws_api_gateway_rest_api.portfolio_api.root_resource_id
+  http_method             = aws_api_gateway_method.get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.portfolio_counter.invoke_arn
+}
+
+resource "aws_api_gateway_method" "post" {
+  rest_api_id   = aws_api_gateway_rest_api.portfolio_api.id
+  resource_id   = aws_api_gateway_rest_api.portfolio_api.root_resource_id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "post_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.portfolio_api.id
+  resource_id             = aws_api_gateway_rest_api.portfolio_api.root_resource_id
+  http_method             = aws_api_gateway_method.post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.portfolio_counter.invoke_arn
+}
+
+# 1. Definicja metody OPTIONS
+resource "aws_api_gateway_method" "options" {
+  rest_api_id   = aws_api_gateway_rest_api.portfolio_api.id
+  resource_id   = aws_api_gateway_rest_api.portfolio_api.root_resource_id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# 2. Odpowiedź dla OPTIONS
+resource "aws_api_gateway_integration" "options_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.portfolio_api.id
+  resource_id             = aws_api_gateway_rest_api.portfolio_api.root_resource_id
+  http_method             = aws_api_gateway_method.options.http_method
+  type                    = "MOCK"
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "options_200" {
+  rest_api_id = aws_api_gateway_rest_api.portfolio_api.id
+  resource_id = aws_api_gateway_rest_api.portfolio_api.root_resource_id
+  http_method = aws_api_gateway_method.options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true,
+    "method.response.header.Access-Control-Allow-Methods" = true,
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.portfolio_api.id
+  resource_id = aws_api_gateway_rest_api.portfolio_api.root_resource_id
+  http_method = aws_api_gateway_method.options.http_method
+  status_code = aws_api_gateway_method_response.options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'",
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+
+  depends_on = [aws_api_gateway_integration.options_integration]
+}
+
+resource "aws_api_gateway_deployment" "portfolio_deploy" {
+  rest_api_id = aws_api_gateway_rest_api.portfolio_api.id
+
+  triggers = {
+    redeployment = sha1(jsonencode([
+      aws_api_gateway_method.options.id,
+      aws_api_gateway_integration.options_integration.id,
+      aws_api_gateway_integration_response.options_integration_response.id,
+      aws_api_gateway_method.get.id,
+      aws_api_gateway_method.post.id    ]))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "prod" {
+  deployment_id = aws_api_gateway_deployment.portfolio_deploy.id
+  rest_api_id   = aws_api_gateway_rest_api.portfolio_api.id
+  stage_name    = "prod"
+}
