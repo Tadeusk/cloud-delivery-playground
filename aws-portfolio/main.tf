@@ -34,7 +34,6 @@ resource "aws_s3_object" "styles" {
     source_hash  = filemd5("website/styles.css")
 }
 
-# The main part. (Cloudfront)
 resource "aws_cloudfront_origin_access_control" "default" {
     name                        = "s3-oac-${var.domain_name}"
     origin_access_control_origin_type  = "s3"
@@ -63,7 +62,7 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
                 forward = "none"
             }
         }
-        viewer_protocol_policy  = "redirect-to-https" #auto https 
+        viewer_protocol_policy  = "redirect-to-https"
         min_ttl                 = 0
         default_ttl             = 3600
         max_ttl                 = 86400
@@ -105,7 +104,7 @@ resource "aws_s3_bucket_policy" "allow_access_from_cloudfront"  {
 }
 
 resource "aws_acm_certificate" "cert" {
-  provider          = aws.us_east_1 # CloudFront wymaga certyfikatów tylko z Virginia!
+  provider          = aws.us_east_1
   domain_name       = var.domain_name
   validation_method = "DNS"
   lifecycle {
@@ -203,7 +202,6 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# --- LAMBDA FUNCTION ---
 resource "aws_lambda_function" "portfolio_counter" {
   filename      = "lambda-functions/function.zip"
   function_name = "portfolio-counter"
@@ -220,8 +218,6 @@ resource "aws_lambda_permission" "apigw" {
   function_name = aws_lambda_function.portfolio_counter.function_name
   principal     = "apigateway.amazonaws.com"
   
-  # Opcjonalnie do konkretnego API:
-  # source_arn = "${aws_api_gateway_rest_api.portfolio_api.execution_arn}/*/*"
 }
 
 resource "aws_api_gateway_resource" "root" {
@@ -271,7 +267,6 @@ resource "aws_api_gateway_integration" "post_integration" {
   uri                     = aws_lambda_function.portfolio_counter.invoke_arn
 }
 
-# 1. Definicja metody OPTIONS
 resource "aws_api_gateway_method" "options" {
   rest_api_id   = aws_api_gateway_rest_api.portfolio_api.id
   resource_id   = aws_api_gateway_rest_api.portfolio_api.root_resource_id
@@ -279,7 +274,6 @@ resource "aws_api_gateway_method" "options" {
   authorization = "NONE"
 }
 
-# 2. Odpowiedź dla OPTIONS
 resource "aws_api_gateway_integration" "options_integration" {
   rest_api_id             = aws_api_gateway_rest_api.portfolio_api.id
   resource_id             = aws_api_gateway_rest_api.portfolio_api.root_resource_id
